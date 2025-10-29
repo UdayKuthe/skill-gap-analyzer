@@ -29,6 +29,7 @@ import { skillsJobsAPI, resumeAPI, analysisAPI } from '../../services/api';
 import { cn } from '../../utils';
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { getHardcodedSkillsForJob } from '../../utils/hardcodedJobSkills';
 
 // Register Chart.js components
 ChartJS.register(
@@ -112,6 +113,29 @@ const SkillGapAnalysis = ({ className }) => {
       return;
     }
 
+    // If we have a hardcoded list for this job, use it to compute analysis locally
+    try {
+      const hardcoded = getHardcodedSkillsForJob(getJobName(selectedJob));
+      const resumeSkills = selectedResume?.extracted_skills || [];
+      if (hardcoded.length > 0) {
+        const present = [];
+        const missing = [];
+        hardcoded.forEach((req) => {
+          const found = resumeSkills.some((rs) => String(rs).toLowerCase().includes(String(req).toLowerCase()));
+          if (found) present.push(req); else missing.push(req);
+        });
+        const score = (present.length / Math.max(hardcoded.length, 1)) * 100;
+        setAnalysisResult({
+          overall_score: score,
+          strong_skills: present,
+          missing_skills: missing,
+          recommendations: [],
+        });
+        toast.success('Analysis completed using provided skills.');
+        return;
+      }
+    } catch (_) {}
+
     setIsAnalyzing(true);
     try {
       const result = await analysisAPI.analyze(
@@ -133,6 +157,28 @@ const SkillGapAnalysis = ({ className }) => {
         message = detail?.msg || JSON.stringify(detail);
       }
       toast.error(String(message));
+
+      // Fallback: perform local analysis if we have a hardcoded mapping
+      try {
+        const hardcoded = getHardcodedSkillsForJob(getJobName(selectedJob));
+        const resumeSkills = selectedResume?.extracted_skills || [];
+        if (hardcoded.length > 0 && resumeSkills.length > 0) {
+          const present = [];
+          const missing = [];
+          hardcoded.forEach((req) => {
+            const found = resumeSkills.some((rs) => String(rs).toLowerCase().includes(String(req).toLowerCase()));
+            if (found) present.push(req); else missing.push(req);
+          });
+          const score = (present.length / Math.max(hardcoded.length, 1)) * 100;
+          setAnalysisResult({
+            overall_score: score,
+            strong_skills: present,
+            missing_skills: missing,
+            recommendations: [],
+          });
+          toast.success('Local analysis completed using provided skills.');
+        }
+      } catch (_) {}
     } finally {
       setIsAnalyzing(false);
     }
@@ -140,14 +186,46 @@ const SkillGapAnalysis = ({ className }) => {
 
   const fetchAndSetJobDetails = async (job) => {
     try {
+      const hardcoded = getHardcodedSkillsForJob(getJobName(merged));
+      // If hardcoded skills exist for this job, don't call backend; use them directly
+      if (hardcoded.length > 0) {
+        const merged = {
+          ...job,
+          required_skills: hardcoded.map((name, idx) => ({
+            id: `hardcoded-${idx}`,
+            skill: { id: `hardcoded-skill-${idx}`, name },
+            importance_level: 'Important',
+            task_description: null,
+          }))
+        };
+        setSelectedJob(merged);
+        return merged;
+      }
+
       const id = getJobId(job);
       if (id == null) { setSelectedJob(job); return job; }
       const details = await skillsJobsAPI.getJobById(id);
       // Merge details (ensures required_skills are present)
-      const merged = { ...job, ...details };
+      let merged = { ...job, ...details };
+      if (!merged.required_skills) merged.required_skills = [];
       setSelectedJob(merged);
       return merged;
     } catch (e) {
+      // On error fetching details, still try to populate from hardcoded mapping
+      const hardcoded = getHardcodedSkillsForJob(getJobName(job));
+      if (hardcoded.length > 0) {
+        const merged = {
+          ...job,
+          required_skills: hardcoded.map((name, idx) => ({
+            id: `hardcoded-${idx}`,
+            skill: { id: `hardcoded-skill-${idx}`, name },
+            importance_level: 'Important',
+            task_description: null,
+          }))
+        };
+        setSelectedJob(merged);
+        return merged;
+      }
       setSelectedJob(job);
       return job;
     }
@@ -305,6 +383,8 @@ const SkillGapAnalysis = ({ className }) => {
                   if (!resume) { setSelectedResume(null); return; }
                   // Fetch status to load extracted skills
                   try {
+                    // Skip backend status if id looks numeric to avoid 404 noise
+                    if (/^\d+$/.test(String(resume.id))) { setSelectedResume(resume); return; }
                     const status = await resumeAPI.getStatus(resume.id);
                     const enriched = {
                       ...resume,
