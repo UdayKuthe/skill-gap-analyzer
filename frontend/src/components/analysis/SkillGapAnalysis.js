@@ -89,9 +89,9 @@ const SkillGapAnalysis = ({ className }) => {
     // Create skill proficiency data from strong and missing skills
     const allSkills = [...(analysisResult.strong_skills || []), ...(analysisResult.missing_skills || [])];
     const uniqueSkills = [...new Set(allSkills)].slice(0, 8); // Show max 8 skills
-    
+
     const labels = uniqueSkills;
-    const proficiencyData = uniqueSkills.map(skill => 
+    const proficiencyData = uniqueSkills.map(skill =>
       analysisResult.strong_skills?.includes(skill) ? 85 + Math.random() * 15 : Math.random() * 40
     );
     const requiredData = uniqueSkills.map(() => 80 + Math.random() * 20);
@@ -164,7 +164,7 @@ const SkillGapAnalysis = ({ className }) => {
         beginAtZero: true,
         max: 100,
         ticks: {
-          callback: function(value) {
+          callback: function (value) {
             return value + '%';
           }
         }
@@ -206,7 +206,7 @@ const SkillGapAnalysis = ({ className }) => {
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800">
                 <InformationCircleIcon className="w-4 h-4 inline mr-1" />
-                <strong>{selectedResume.extracted_skills.length} skills detected.</strong> 
+                <strong>{selectedResume.extracted_skills.length} skills detected.</strong>
                 Select a target job below to see how your skills match against job requirements.
               </p>
             </div>
@@ -218,7 +218,7 @@ const SkillGapAnalysis = ({ className }) => {
       <div className="card">
         <div className="card-body">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">Skill Gap Analysis Setup</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Resume Selection */}
             <div>
@@ -243,7 +243,7 @@ const SkillGapAnalysis = ({ className }) => {
               </select>
               {selectedResume && (
                 <p className="mt-2 text-sm text-gray-600">
-                  {selectedResume.extracted_skills?.length || 0} skills extracted • 
+                  {selectedResume.extracted_skills?.length || 0} skills extracted •
                   Uploaded {new Date(selectedResume.upload_date).toLocaleDateString()}
                 </p>
               )}
@@ -272,7 +272,7 @@ const SkillGapAnalysis = ({ className }) => {
               </select>
               {selectedJob && (
                 <p className="mt-2 text-sm text-gray-600">
-                  {selectedJob.required_skills?.length || 0} skills required • 
+                  {selectedJob.required_skills?.length || 0} skills required •
                   {selectedJob.category} category
                 </p>
               )}
@@ -446,7 +446,7 @@ const SkillGapAnalysis = ({ className }) => {
                 <DocumentTextIcon className="w-5 h-5 mr-2 text-gray-600" />
                 Complete Skills Overview
               </h3>
-              
+
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* All Extracted Skills */}
                 <div>
@@ -456,8 +456,8 @@ const SkillGapAnalysis = ({ className }) => {
                   </h4>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {selectedResume?.extracted_skills?.map((skill, index) => (
-                      <div 
-                        key={index} 
+                      <div
+                        key={index}
                         className={cn(
                           "p-2 rounded-lg text-sm border",
                           analysisResult.strong_skills?.includes(skill)
@@ -490,8 +490,8 @@ const SkillGapAnalysis = ({ className }) => {
                         <CheckCircleIcon className="w-4 h-4 inline ml-2 text-success-600" />
                       </div>
                     )) || (
-                      <p className="text-gray-500 text-sm">No matching skills found</p>
-                    )}
+                        <p className="text-gray-500 text-sm">No matching skills found</p>
+                      )}
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
                     Skills you have that match job requirements
@@ -511,8 +511,8 @@ const SkillGapAnalysis = ({ className }) => {
                         <ExclamationTriangleIcon className="w-4 h-4 inline ml-2 text-warning-600" />
                       </div>
                     )) || (
-                      <p className="text-gray-500 text-sm">No skill gaps identified</p>
-                    )}
+                        <p className="text-gray-500 text-sm">No skill gaps identified</p>
+                      )}
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
                     Required job skills you should develop
