@@ -173,11 +173,14 @@
 
   // Analysis API
   export const analysisAPI = {
-    analyze: async (resumeId, jobTitle) => {
-      const response = await api.post('/analysis/analyze', {
-        resume_id: resumeId,
-        job_title: jobTitle,
-      });
+    analyze: async (resumeId, jobId, jobTitle) => {
+      const payload = {
+        resume_id: String(resumeId),
+        // Send both to support either backend contract (job_title or target_job_id)
+        target_job_id: jobId != null ? String(jobId) : undefined,
+        job_title: jobTitle || undefined,
+      };
+      const response = await api.post('/analysis/analyze', payload);
       return response.data;
     },
 

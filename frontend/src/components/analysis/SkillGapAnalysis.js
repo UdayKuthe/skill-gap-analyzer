@@ -64,6 +64,48 @@ const SkillGapAnalysis = ({ className }) => {
     { staleTime: 10 * 60 * 1000 }
   );
 
+  // Whitelist of allowed professions (displayed in dropdown only)
+  const ALLOWED_JOB_NAMES = [
+    'Human Resources Managers',
+    'Computer Systems Analysts',
+    'Database Administrators',
+    'Computer Programmers',
+    'Software Developers',
+    'Web Developers',
+    'Data Scientists'
+  ];
+
+  // Normalize comparison to support API using either `name` or `title`
+  const getJobName = (job) => (job?.name || job?.title || '').trim();
+  const getJobCategory = (job) => (job?.category || '').trim();
+  const getJobId = (job) => job?.id;
+  const isUuidLike = (v) => typeof v === 'string' && v.includes('-') && v.length >= 8; // no longer used for gating
+
+  const allowedSet = new Set(ALLOWED_JOB_NAMES.map(n => n.toLowerCase()));
+  const normalize = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+  const singularize = (s) => s.endsWith('s') ? s.slice(0, -1) : s;
+
+  const availableJobs = (jobs?.jobs || jobs || []).map(j => ({
+    ...j,
+    _nameNorm: normalize(getJobName(j)),
+    _nameSingular: singularize(normalize(getJobName(j)))
+  }));
+
+  // Build filtered list in the order of the whitelist but ONLY include real backend jobs
+  const filteredJobs = ALLOWED_JOB_NAMES
+    .map((allowed) => {
+      const allowedNorm = normalize(allowed);
+      const allowedSing = singularize(allowedNorm);
+      const match = availableJobs.find(j => (
+        j._nameNorm === allowedNorm ||
+        j._nameSingular === allowedSing ||
+        j._nameNorm.includes(allowedSing) ||
+        allowedNorm.includes(j._nameSingular)
+      ));
+      return match || null;
+    })
+    .filter(Boolean);
+
   const handleAnalysis = async () => {
     if (!selectedResume || !selectedJob) {
       toast.error('Please select both a resume and a job profession');
@@ -72,14 +114,42 @@ const SkillGapAnalysis = ({ className }) => {
 
     setIsAnalyzing(true);
     try {
-      const result = await analysisAPI.analyze(selectedResume.id, selectedJob.title);
+      const result = await analysisAPI.analyze(
+        selectedResume.id,
+        getJobId(selectedJob),
+        getJobName(selectedJob)
+      );
       setAnalysisResult(result);
       toast.success('Analysis completed successfully!');
     } catch (error) {
-      const message = error.response?.data?.detail || 'Analysis failed. Please try again.';
-      toast.error(message);
+      const detail = error.response?.data?.detail;
+      let message = 'Analysis failed. Please try again.';
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        // FastAPI validation error format
+        message = detail.map((d) => d?.msg || JSON.stringify(d)).join('; ');
+      } else if (detail && typeof detail === 'object') {
+        message = detail?.msg || JSON.stringify(detail);
+      }
+      toast.error(String(message));
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const fetchAndSetJobDetails = async (job) => {
+    try {
+      const id = getJobId(job);
+      if (id == null) { setSelectedJob(job); return job; }
+      const details = await skillsJobsAPI.getJobById(id);
+      // Merge details (ensures required_skills are present)
+      const merged = { ...job, ...details };
+      setSelectedJob(merged);
+      return merged;
+    } catch (e) {
+      setSelectedJob(job);
+      return job;
     }
   };
 
@@ -228,23 +298,36 @@ const SkillGapAnalysis = ({ className }) => {
               </label>
               <select
                 value={selectedResume?.id || ''}
-                onChange={(e) => {
-                  const resume = resumes?.resumes?.find(r => r.id === parseInt(e.target.value));
+                onChange={async (e) => {
+                  const value = e.target.value;
+                  const resumeList = (resumes?.resumes || resumes || []);
+                  const resume = resumeList.find(r => String(r.id) === String(value));
+                  if (!resume) { setSelectedResume(null); return; }
+                  // Fetch status to load extracted skills
+                  try {
+                    const status = await resumeAPI.getStatus(resume.id);
+                    const enriched = {
+                      ...resume,
+                      extracted_skills: (status?.extracted_skills || []).map(s => s.skill_name || s.text).filter(Boolean)
+                    };
+                    setSelectedResume(enriched);
+                  } catch {
                   setSelectedResume(resume);
+                  }
                 }}
                 className="input"
               >
                 <option value="">Choose a resume...</option>
-                {resumes?.resumes?.map((resume) => (
+                {(resumes?.resumes || resumes || []).map((resume) => (
                   <option key={resume.id} value={resume.id}>
-                    {resume.filename} ({resume.extracted_skills?.length || 0} skills)
+                    {resume.filename} ({resume.skills_count ?? resume.extracted_skills?.length ?? 0} skills)
                   </option>
                 ))}
               </select>
               {selectedResume && (
                 <p className="mt-2 text-sm text-gray-600">
-                  {selectedResume.extracted_skills?.length || 0} skills extracted •
-                  Uploaded {new Date(selectedResume.upload_date).toLocaleDateString()}
+                  {selectedResume.extracted_skills?.length || selectedResume.skills_count || 0} skills extracted •
+                  Uploaded {new Date(selectedResume.created_at || selectedResume.upload_date).toLocaleDateString()}
                 </p>
               )}
             </div>
@@ -257,23 +340,35 @@ const SkillGapAnalysis = ({ className }) => {
               </label>
               <select
                 value={selectedJob?.id || ''}
-                onChange={(e) => {
-                  const job = jobs?.jobs?.find(j => j.id === parseInt(e.target.value));
+                onChange={async (e) => {
+                  const value = e.target.value;
+                  // Try strict match on filtered list first
+                  let job = filteredJobs?.find(j => String(getJobId(j)) === String(value))
+                    || (jobs?.jobs || jobs || []).find(j => String(getJobId(j)) === String(value));
+
+                  // If not found, do nothing (we only allow real backend jobs in the list)
+                  if (!job) return;
+
+                  // If the job has a real ID, fetch details (required_skills)
+                  if (getJobId(job) != null) {
+                    await fetchAndSetJobDetails(job);
+                  } else {
                   setSelectedJob(job);
+                  }
                 }}
                 className="input"
               >
                 <option value="">Choose a job profession...</option>
-                {jobs?.jobs?.map((job) => (
-                  <option key={job.id} value={job.id}>
-                    {job.title} ({job.category})
+                {filteredJobs?.map((job) => (
+                  <option key={getJobId(job)} value={getJobId(job)}>
+                    {getJobName(job)} {getJobCategory(job) ? `(${getJobCategory(job)})` : ''}
                   </option>
                 ))}
               </select>
               {selectedJob && (
                 <p className="mt-2 text-sm text-gray-600">
                   {selectedJob.required_skills?.length || 0} skills required •
-                  {selectedJob.category} category
+                  {getJobCategory(selectedJob)} category
                 </p>
               )}
             </div>
