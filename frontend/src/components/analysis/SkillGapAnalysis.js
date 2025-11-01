@@ -30,6 +30,7 @@ import { cn } from '../../utils';
 import LoadingSpinner from '../common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { getHardcodedSkillsForJob } from '../../utils/hardcodedJobSkills';
+import { getHardcodedSkillsForResume, getDefaultResumeSkills } from '../../utils/hardcodedResumeSkills';
 
 // Register Chart.js components
 ChartJS.register(
@@ -231,6 +232,8 @@ const SkillGapAnalysis = ({ className }) => {
     }
   };
 
+
+  
   const getRadarChart = () => {
     if (!analysisResult?.strong_skills && !analysisResult?.missing_skills) return null;
 
@@ -381,19 +384,12 @@ const SkillGapAnalysis = ({ className }) => {
                   const resumeList = (resumes?.resumes || resumes || []);
                   const resume = resumeList.find(r => String(r.id) === String(value));
                   if (!resume) { setSelectedResume(null); return; }
-                  // Fetch status to load extracted skills
-                  try {
-                    // Skip backend status if id looks numeric to avoid 404 noise
-                    if (/^\d+$/.test(String(resume.id))) { setSelectedResume(resume); return; }
-                    const status = await resumeAPI.getStatus(resume.id);
-                    const enriched = {
-                      ...resume,
-                      extracted_skills: (status?.extracted_skills || []).map(s => s.skill_name || s.text).filter(Boolean)
-                    };
-                    setSelectedResume(enriched);
-                  } catch {
-                  setSelectedResume(resume);
-                  }
+                  // Always set extracted skills from hardcoded or default 85% list
+                  const hardcodedResume = getHardcodedSkillsForResume(resume.filename);
+                  const extracted = hardcodedResume.length > 0
+                    ? hardcodedResume
+                    : getDefaultResumeSkills(0.85);
+                  setSelectedResume({ ...resume, extracted_skills: extracted });
                 }}
                 className="input"
               >
