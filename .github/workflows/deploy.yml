@@ -5,6 +5,8 @@ on:
     branches: [ main ]
 
 env:
+  AWS_ACCESS_KEY_ID: AKIAYXYGDDVQ6LMQUSWC
+  AWS_SECRET_ACCESS_KEY: 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
   AWS_REGION: us-east-1
   ECR_REPOSITORY: skill-gap-backend
   ECS_SERVICE: backend-service
