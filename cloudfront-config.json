@@ -1,0 +1,35 @@
+{
+  "CallerReference": "skill-gap-frontend-1762146975",
+  "Comment": "Skill Gap Analyzer CDN",
+  "Origins": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "Id": "S3-skill-gap-frontend",
+        "DomainName": "skill-gap-frontend-1762146975.s3-website-us-east-1.amazonaws.com",
+        "CustomOriginConfig": {
+          "HTTPPort": 80,
+          "HTTPSPort": 443,
+          "OriginProtocolPolicy": "http-only"
+        }
+      }
+    ]
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "S3-skill-gap-frontend",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "TrustedSigners": {
+      "Enabled": false,
+      "Quantity": 0
+    },
+    "ForwardedValues": {
+      "QueryString": false,
+      "Cookies": { "Forward": "none" }
+    },
+    "MinTTL": 0,
+    "Compress": true
+  },
+  "Enabled": true,
+  "PriceClass": "PriceClass_All",
+  "DefaultRootObject": "index.html"
+}
