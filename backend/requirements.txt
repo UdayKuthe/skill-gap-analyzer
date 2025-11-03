@@ -41,7 +41,9 @@ redis==5.0.1
 structlog==23.2.0
 
 # CORS
-python-cors==1.0.1
+# python-cors==1.0.1
+fastapi
+uvicorn
 
 # Caching (optional)
 python-memcached==1.62
